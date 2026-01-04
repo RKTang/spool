@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SPOOL.</title>
+    
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0a'/%3E%3Cg fill='none' stroke='%23e0e0e0' stroke-width='2'%3E%3Cellipse cx='16' cy='8' rx='12' ry='4'/%3E%3Cellipse cx='16' cy='24' rx='12' ry='4'/%3E%3Cpath d='M4 8 v16 M28 8 v16'/%3E%3Cpath d='M4 12 c0 2 12 4 12 4 s12 -2 12 -4' stroke-dasharray='2,2'/%3E%3Cpath d='M4 20 c0 2 12 4 12 4 s12 -2 12 -4' stroke-dasharray='2,2'/%3E%3C/g%3E%3C/svg%3E">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <style>
+        /* --- BRUTALIST UI THEME --- */
+        :root { --bg: #0a0a0a; --fg: #e0e0e0; --acc: #3355ff; --panel: rgba(0,0,0,0.85); --border: 1px solid #333; }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: 'Courier New', monospace; color: var(--fg); user-select: none; }
+        canvas { display: block; outline: none; }
+
+        /* SCROLLBARS */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #444; }
+
+        /* LAYOUT */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: grid; grid-template-columns: 280px 1fr 280px; grid-template-rows: 60px 1fr 60px; }
+        .interactive { pointer-events: auto; background: var(--panel); border: var(--border); padding: 15px; overflow-y: auto; backdrop-filter: blur(5px); transition: opacity 0.3s ease; }
+        
+        /* HEADER */
+        header { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; background: var(--bg); border-bottom: var(--border); pointer-events: auto; transition: opacity 0.3s ease; }
+        h1 { font-size: 18px; margin: 0; letter-spacing: 2px; font-weight: 700; }
+        .status-dot { color: var(--acc); font-size: 10px; animation: blink 2s infinite; }
+        
+        /* PANELS */
+        #left-panel { grid-row: 2 / 3; grid-column: 1 / 2; border-right: var(--border); }
+        #right-panel { grid-row: 2 / 3; grid-column: 3 / 4; border-left: var(--border); }
+        
+        /* FOOTER */
+        footer { grid-column: 1 / -1; border-top: var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; pointer-events: auto; padding: 0 20px; gap: 20px; transition: opacity 0.3s ease; }
+
+        /* FULL SCREEN HIDDEN STATE */
+        body.fs-active header,
+        body.fs-active footer,
+        body.fs-active .interactive {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* CONTROLS */
+        .control-group { margin-bottom: 25px; }
+        .control-header { font-size: 10px; color: #666; text-transform: uppercase; border-bottom: 1px solid #333; margin-bottom: 10px; padding-bottom: 4px; letter-spacing: 1px; }
+        
+        label { font-size: 11px; display: flex; justify-content: space-between; margin-top: 8px; color: #aaa;}
+        input[type="text"], select { width: 100%; background: #222; border: 1px solid #444; color: white; padding: 8px; font-family: inherit; font-size: 12px; margin-top: 5px; outline: none; box-sizing: border-box;}
+        
+        /* SLIDERS */
+        input[type="range"] { width: 100%; height: 6px; background: #333; appearance: none; margin-top: 5px; cursor: pointer; border-radius: 3px; }
+        input[type="range"]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: var(--acc); border-radius: 50%; cursor: pointer; border: 2px solid #fff; }
+        
+        /* COLOR & CHECK */
+        .color-row { display: flex; gap: 10px; }
+        .color-item { flex: 1; }
+        .color-item label { margin-bottom: 4px; display: block; font-size: 10px; color: #888; margin-top: 0;}
+        input[type="color"] { width: 100%; height: 40px; border: 1px solid #444; padding: 0; background: none; cursor: pointer; }
+        
+        .check-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; cursor: pointer; }
+        input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--acc); cursor: pointer; margin: 0; }
+        .checkbox-label { font-size: 11px; color: #ddd; cursor: pointer; }
+
+        /* BUTTONS */
+        .btn-main { width: 100%; background: #fff; color: #000; border: none; padding: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-size: 12px; transition: 0.2s; }
+        .btn-main:hover { background: #ccc; }
+        
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="ui-layer">
+    <header>
+        <h1>SPOOL <span class="status-dot">●</span></h1>
+        <div style="font-size: 11px; color: #666;">FREE MODE</div>
+    </header>
+
+    <div id="left-panel" class="interactive">
+        <div class="control-group">
+            <div class="control-header">Input Data</div>
+            <input type="text" id="userText" value="PROGRESS, NOT PERFECTION ">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">Typography</div>
+            <select id="fontSelect">
+                <option value="Courier New" selected>Courier (Code)</option>
+                <option value="Arial">Arial / Helvetica</option>
+                <option value="Verdana">Verdana (Wide)</option>
+                <option value="Tahoma">Tahoma (Modern)</option>
+                <option value="Trebuchet MS">Trebuchet MS</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Georgia">Georgia (Elegant)</option>
+                <option value="Palatino">Palatino (Old Style)</option>
+                <option value="Impact">Impact (Heavy)</option>
+                <option value="Comic Sans MS">Comic Sans (Retro)</option>
+            </select>
+            <label><span>Base Size</span></label>
+            <input type="range" id="textSizeSlider" min="20" max="300" value="80">
+            
+            <label><span>Row Count (Repeat)</span></label>
+            <input type="range" id="repeatSlider" min="1" max="15" value="8">
+            
+            <label><span>Line Spacing</span></label>
+            <input type="range" id="lineSpacingSlider" min="0" max="200" value="50">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">Type Transforms</div>
+            <label>TYPE: X-Scale</label>
+            <input type="range" id="typeScaleX" min="0.5" max="4.0" step="0.1" value="1.0">
+            <label>TYPE: Y-Scale</label>
+            <input type="range" id="typeScaleY" min="0.5" max="4.0" step="0.1" value="1.0">
+            <label>TYPE: Weight</label>
+            <input type="range" id="typeWeight" min="0" max="8" step="0.5" value="0">
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">Palette</div>
+            <div class="color-row">
+                <div class="color-item">
+                    <label>TEXT COLOR</label>
+                    <input type="color" id="textColor" value="#ffffff">
+                </div>
+                <div class="color-item">
+                    <label>BACKGROUND COLOR</label>
+                    <input type="color" id="bgColor" value="#000000">
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <div class="control-header">View</div>
+            <button class="btn-main" onclick="toggleFullscreen()" id="fsBtn">ENTER FULL SCREEN</button>
+            <div style="font-size: 9px; color: #666; margin-top: 5px; text-align: center;">Press ESC to exit</div>
+        </div>
+    </div>
+
+    <div id="right-panel" class="interactive">
+        <div class="control-group">
+            <div class="control-header">Geometry</div>
+            <select id="shapeSelect">
+                <option value="cylinder">Cylinder (Open)</option>
+                <option value="torus">Torus (Donut)</option>
+                <option value="sphere" selected>Sphere (Globe)</option>
+                <option value="plane">Plane (Flag)</option>
+                <option value="box">Cube (Box)</option>
+            </select>
+            
+            <label>Radius / Scale</label>
+            <input type="range" id="radiusSlider" min="50" max="500" value="200">
+            <label>Height / Thickness</label>
+            <input type="range" id="heightSlider" min="10" max="800" value="400">
+            
+            <div class="check-row">
+                <input type="checkbox" id="wireframeCheck">
+                <label for="wireframeCheck" class="checkbox-label">WIREFRAME_MODE</label>
+            </div>
+            
+            <div class="check-row">
+                <input type="checkbox" id="cullCheck">
+                <label for="cullCheck" class="checkbox-label">HIDE BACK FACES</label>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-header">Kinetic Modulation</div>
+            <label>Sine Wave Distortion</label>
+            <label>Wobble Speed</label>
+            <input type="range" id="waveFreq" min="0" max="20" value="0">
+            <label>Wobble Strength</label>
+            <input type="range" id="waveAmp" min="0" max="100" value="0">
+        </div>
+    </div>
+
+    <footer>
+        <label style="margin: 0; white-space: nowrap; font-weight: bold;">ROTATION SPEED:</label>
+        <input type="range" id="speedSlider" min="-50" max="50" value="0" step="1" style="width: 300px;">
+        <span id="speedDisplay" style="font-size: 12px; width: 30px;">0</span>
+    </footer>
+</div>
+
+<script>
+    let pg; 
+    let canvasElement;
+    
+    // Animation State
+    let currentRotation = 0;
+
+    function setup() {
+        let cnv = createCanvas(windowWidth, windowHeight, WEBGL);
+        canvasElement = cnv.canvas;
+        setAttributes('antialias', true);
+        
+        pg = createGraphics(2048, 1024);
+        pg.textAlign(CENTER, CENTER);
+        pg.noStroke();
+        textureMode(NORMAL);
+    }
+
+    function draw() {
+        const txt = document.getElementById('userText').value;
+        const font = document.getElementById('fontSelect').value;
+        const shape = document.getElementById('shapeSelect').value;
+        const rad = parseInt(document.getElementById('radiusSlider').value);
+        const h = parseInt(document.getElementById('heightSlider').value);
+        const txtSize = parseInt(document.getElementById('textSizeSlider').value);
+        const rows = parseInt(document.getElementById('repeatSlider').value);
+        const lineSpacing = parseInt(document.getElementById('lineSpacingSlider').value);
+        const typeScaleX = parseFloat(document.getElementById('typeScaleX').value);
+        const typeScaleY = parseFloat(document.getElementById('typeScaleY').value);
+        const typeWeight = parseFloat(document.getElementById('typeWeight').value);
+        const waveFreq = parseInt(document.getElementById('waveFreq').value);
+        const waveAmp = parseInt(document.getElementById('waveAmp').value);
+        const cTxt = document.getElementById('textColor').value;
+        const cBg = document.getElementById('bgColor').value;
+        const wire = document.getElementById('wireframeCheck').checked;
+        const hideBack = document.getElementById('cullCheck').checked;
+        
+        let speedVal = parseInt(document.getElementById('speedSlider').value);
+        document.getElementById('speedDisplay').innerText = speedVal;
+
+        // Rotation Math
+        currentRotation += speedVal * 0.002;
+
+        // Texture
+        pg.clear(); // Transparent buffer
+        pg.fill(cTxt);
+        pg.textFont(font);
+        pg.textSize(txtSize);
+        if (typeWeight > 0) {
+            pg.stroke(cTxt);
+            pg.strokeWeight(typeWeight);
+        } else {
+            pg.noStroke();
+        }
+        
+        let fullLine = "";
+        let repeatsH = 4; 
+        for(let i=0; i<repeatsH; i++) fullLine += txt + " ";
+        
+        let spacing = txtSize + lineSpacing; 
+        let totalBlockHeight = rows * spacing;
+        let startY = (pg.height - totalBlockHeight) / 2 + (spacing/2);
+        
+        for(let y=0; y<rows; y++) {
+            let yPos = startY + (y * spacing);
+            pg.push();
+            pg.translate(pg.width/2, yPos);
+            pg.scale(typeScaleX, typeScaleY); 
+            pg.text(fullLine + fullLine, 0, 0); 
+            pg.pop();
+        }
+
+        background(cBg); 
+        orbitControl(); 
+        push();
+        
+        let rx = 0; 
+        let rz = 0;
+        if(waveAmp > 0) {
+            let timeBase = frameCount * 0.05;
+            rx += sin(timeBase * (waveFreq/5)) * radians(waveAmp);
+            rz += cos(timeBase * (waveFreq/5)) * radians(waveAmp) * 0.5;
+        }
+
+        rotateX(rx);
+        rotateZ(rz);
+        rotateY(currentRotation); 
+
+        let detailX = 70; 
+        let detailY = 2;
+        const gl = drawingContext;
+
+        function drawShape() {
+            switch(shape) {
+                case 'cylinder':
+                    cylinder(rad, h, detailX, detailY, false, false);
+                    break;
+                case 'torus':
+                    torus(rad, h/4, detailX, 40);
+                    break;
+                case 'sphere':
+                    sphere(rad, detailX, detailX);
+                    break;
+                case 'plane':
+                    plane(rad*2, h, detailX/2, detailY);
+                    break;
+                case 'box':
+                     box(rad, h, rad);
+                     break;
+            }
+        }
+
+        if(wire) {
+            stroke(cTxt);
+            strokeWeight(1.2);
+            noFill();
+            detailX = 24; 
+            detailY = 6;
+            drawShape();
+        } else {
+            noStroke();
+            noFill(); 
+            texture(pg);
+
+            if (hideBack) {
+                gl.enable(gl.CULL_FACE);
+                gl.cullFace(gl.BACK);
+                drawShape();
+                gl.disable(gl.CULL_FACE);
+            } else {
+                if (shape === 'plane') {
+                    drawShape();
+                    push(); rotateY(PI); drawShape(); pop();
+                } else {
+                    gl.enable(gl.CULL_FACE);
+                    gl.cullFace(gl.FRONT);
+                    drawShape();
+                    gl.cullFace(gl.BACK);
+                    drawShape();
+                    gl.disable(gl.CULL_FACE);
+                }
+            }
+        }
+        pop();
+    }
+
+    function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+    }
+
+    // --- FULL SCREEN LOGIC ---
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    }
+    
+    document.addEventListener('fullscreenchange', (event) => {
+        if (document.fullscreenElement) {
+            document.body.classList.add('fs-active');
+        } else {
+            document.body.classList.remove('fs-active');
+        }
+    });
+</script>
+
+</body>
+</html>
