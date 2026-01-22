@@ -81,7 +81,8 @@
     <div id="left-panel" class="interactive">
         <div class="control-group">
             <div class="control-header">Input Data</div>
-            <input type="text" id="userText" value=".....SPOOL.......">
+            <input type="text" id="userText" value="SPOOL." title="Use / to split lines">
+            <div style="font-size: 9px; color: #666; margin-top: 4px;">Use <b>/</b> to split text onto new lines</div>
         </div>
 
         <div class="control-group">
@@ -156,7 +157,7 @@
             <input type="range" id="heightSlider" min="10" max="800" value="400">
             
             <div class="check-row">
-                <input type="checkbox" id="wireframeCheck">
+                <input type="checkbox" id="wireframeCheck" checked >
                 <label for="wireframeCheck" class="checkbox-label">WIREFRAME_MODE</label>
             </div>
             
@@ -226,8 +227,11 @@
         // Rotation Math
         currentRotation += speedVal * 0.002;
 
-        // Texture
-        pg.clear(); // Transparent buffer
+        // --- MULTI-LINE LOGIC ---
+        let textParts = txt.split('/');
+        
+        // --- TEXTURE BUFFER ---
+        pg.clear(); 
         pg.fill(cTxt);
         pg.textFont(font);
         pg.textSize(txtSize);
@@ -238,16 +242,17 @@
             pg.noStroke();
         }
         
-        let fullLine = "";
         let repeatsH = 4; 
-        for(let i=0; i<repeatsH; i++) fullLine += txt + " ";
-        
         let spacing = txtSize + lineSpacing; 
         let totalBlockHeight = rows * spacing;
         let startY = (pg.height - totalBlockHeight) / 2 + (spacing/2);
         
         for(let y=0; y<rows; y++) {
             let yPos = startY + (y * spacing);
+            let currentLineText = textParts[y % textParts.length].trim();
+            let fullLine = "";
+            for(let i=0; i<repeatsH; i++) fullLine += currentLineText + " ";
+
             pg.push();
             pg.translate(pg.width/2, yPos);
             pg.scale(typeScaleX, typeScaleY); 
@@ -255,8 +260,14 @@
             pg.pop();
         }
 
+        // --- RENDER SCENE ---
         background(cBg); 
         orbitControl(); 
+        
+        // ADD LIGHTING TO FIX FLAT LOOK
+        ambientLight(100);
+        pointLight(255, 255, 255, 0, 0, 600); 
+
         push();
         
         let rx = 0; 
@@ -271,8 +282,22 @@
         rotateZ(rz);
         rotateY(currentRotation); 
 
+        // --- GEOMETRY DETAIL LOGIC ---
         let detailX = 70; 
-        let detailY = 2;
+        let detailY = 2; // Default for things like cylinder height
+
+        // FIX TORUS FLATNESS: 
+        // A torus needs high DetailY (tube segments) to look round, not flat.
+        if (shape === 'torus') {
+            detailY = 40; 
+        }
+
+        // Wireframe overrides
+        if(wire) {
+            detailX = 24; 
+            detailY = 6; 
+        }
+
         const gl = drawingContext;
 
         function drawShape() {
@@ -281,13 +306,13 @@
                     cylinder(rad, h, detailX, detailY, false, false);
                     break;
                 case 'torus':
-                    torus(rad, h/4, detailX, 40);
+                    torus(rad, h/4, detailX, detailY);
                     break;
                 case 'sphere':
                     sphere(rad, detailX, detailX);
                     break;
                 case 'plane':
-                    plane(rad*2, h, detailX/2, detailY);
+                    plane(rad*2, h, detailX, detailY);
                     break;
                 case 'box':
                      box(rad, h, rad);
@@ -299,8 +324,7 @@
             stroke(cTxt);
             strokeWeight(1.2);
             noFill();
-            detailX = 24; 
-            detailY = 6;
+            gl.disable(gl.CULL_FACE);
             drawShape();
         } else {
             noStroke();
@@ -333,7 +357,6 @@
         resizeCanvas(windowWidth, windowHeight);
     }
 
-    // --- FULL SCREEN LOGIC ---
     function toggleFullscreen() {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
